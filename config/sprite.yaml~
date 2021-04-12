@@ -1,0 +1,82 @@
+Configuration:
+    katcp_port: 7147
+    boffile: ami_fx_sbl_nofs_2014_Sep_30_1526.bof
+    # control_interface keys taken from AMIDC_sbl_4bit.yaml --> need to figure out correct parameters and set them
+    control_interface:
+        host: 131.215.195.193
+        data_port: 2007 # ?
+        meta_port: 2006 # ?
+        n_ants: 2
+    correlator:
+        hardcoded:
+            n_ants: 2
+            n_bands: 2
+            n_chans: 2048
+            inputs_per_board: 2
+            window_len: 8
+            output_format: l
+            n_pols: 1
+            sync_period: 738197504 # copied from Jack's code
+        runtime:
+            fft_shift: 0b000000000000000  # 0b111011011011011
+            one_gbe:
+                network: 192.168.10.10
+                port: 10000
+            testing:
+                ct_tvg: no
+                qdr_tvg: no
+                vacc_tvg: no
+            acc_len: 152588
+            data_path: /home/sprite/installs/sprite_correlator_sw/data
+
+XEngine:
+    n_chans: 2048
+    n_ants: 2
+    acc_len: 152588  # copied from the FEngine category - possibly needs to be different
+
+    nodes:
+        - band: low
+          host: 192.168.10.100
+
+
+Array:
+    # array location in degrees - CHECK!!!!!
+    lat: 37.2317
+    lon: -118.2951
+
+Antennas:
+    - ant: 0
+      loc: [22.0076, 17.5829, 0.0]
+      index: 9
+    - ant: 1
+      loc: [12.0739, 7.7928, 0.0]
+      index: 9
+
+FEngine:
+    n_chans: 2048
+    adc_power_acc_len: 2500000000
+    #fft_power_acc_len counts in spectra. 1048537 is about 0.85s
+    #(but at the moment it can only be a number <= 20 bits)
+    fft_power_acc_len: 1048575
+    adc_clk: 4000
+    mix_freq: 9000
+    eq_dec: 2
+    eq_format: 'H'
+    eq_bp: 1
+    
+    nodes:
+        - ant: 0
+          band: low
+          adc: 0
+          host: 192.168.10.100
+          phase_switch: no
+
+        - ant: 1
+          band: low
+          adc: 1
+          host: 192.168.10.100
+          phase_switch: no
+
+XEngines:
+    - chans: 0, 2047
+      host: 192.168.10.100
