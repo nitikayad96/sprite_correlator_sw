@@ -15,7 +15,7 @@ Configuration:
             n_chans: 2048
             inputs_per_board: 2
             window_len: 8
-            output_format: l
+            output_format: q
             n_pols: 1
             sync_period: 738197504 # copied from Jack's code
         runtime:
@@ -28,7 +28,7 @@ Configuration:
                 qdr_tvg: no
                 vacc_tvg: no
             acc_len: 152588
-            data_path: /home/sprite/installs/sprite_correlator_sw/data
+            data_path: /home/sprite/installs/sprite_correlator_sw/data/lowband
 
 XEngine:
     n_chans: 2048
@@ -37,7 +37,7 @@ XEngine:
 
     nodes:
         - band: low
-          host: 192.168.10.100
+          host: 192.168.10.101
 
 
 Array:
@@ -69,15 +69,15 @@ FEngine:
         - ant: 0
           band: low
           adc: 0
-          host: 192.168.10.100
+          host: 192.168.10.101
           phase_switch: no
 
         - ant: 1
           band: low
           adc: 1
-          host: 192.168.10.100
+          host: 192.168.10.101
           phase_switch: no
 
 XEngines:
     - chans: 0, 2047
-      host: 192.168.10.100
+      host: 192.168.10.101

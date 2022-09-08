@@ -49,8 +49,14 @@ class spriteDBE(object):
         self.connect_to_roaches()
         time.sleep(0.1)
 
-        if program:
-            self.program_all()
+        # reprogramming messes with ctrl_sw, etc, so clean out the engine lists
+        #self._logger.info("Re-initializing engines")
+        self.initialise_f_engines(passive=False)
+        self.initialise_x_engines(passive=False)
+
+        
+        #if program:
+        #    self.program_all()
 
     def set_walsh(self, period=5, noise=15):
         for feng in self.fengs:
@@ -131,23 +137,16 @@ class spriteDBE(object):
         ##print 'rv', target_sync * self.sync_clocks
         return target_sync * self.sync_clocks
 
-    def arm_vaccs(self, armtime):
-        if (armtime - 2) < time.time():
-            self._logger.error("You can't arm X-Engine vaccs less than 2 seconds in the future")
-            raise RuntimeError("You can't arm X-Engine vaccs less than 2 seconds in the future")
-        # the arm time (in adc clocks since sync)rounded to an integer number of sync cycles since fpga sync
-        arm_clocks = self.round_time_to_sync_clocks(armtime)
-        ##print arm_clocks
-        arm_mcnt = arm_clocks // 2 // self.f_n_chans // self.window_len
-        ##print arm_mcnt
-        self._logger.info("Arming Xengines at %s (MCNT: %d, 0x%8x, (bottom 20 bits: %d))"%(time.ctime(self.mcnt2time(arm_mcnt)), arm_mcnt, arm_mcnt, arm_mcnt&(2**20 - 1)))
+    def arm_vaccs(self):
+
         for xeng in self.xengs:
+            mcnt_msb = xeng.read_uint('mcnt_msb')
+            mcnt_lsb = xeng.read_uint('mcnt_lsb')
+            mcnt = (mcnt_msb << 32) + mcnt_lsb
+            arm_mcnt = (mcnt_msb+1 << 32) + mcnt_lsb 
             xeng.set_vacc_arm(arm_mcnt & (2**32-1)) # we only trigger on the bottom 32 bits
             xeng.reset_vacc()
-        # and update the value in redis	
-        self.redis_host.set('vacc_arm_mcnt', arm_mcnt) 
-        if time.time() + 1 > armtime:
-            self._logger.warning("Finished arming XEngines with less than 1s to spare")
+
 
     def get_current_mcnt(self):
         return self.time_to_mcnt(time.time())
@@ -165,9 +164,10 @@ class spriteDBE(object):
         #ready=0
         #while not ready:
         #    ready=((int(time.time()*10+5)%10)==0)
-        t = self.fengs[0].roachhost.read_int('pps_count')
-        while self.fengs[0].roachhost.read_int('pps_count') == t:
-            time.sleep(0.001)
+        if not send_sync:
+            t = self.fengs[0].roachhost.read_int('pps_count')
+            while self.fengs[0].roachhost.read_int('pps_count') == t:
+                time.sleep(0.001)
         #+4 because the firmware is configured to sync after 4 PPS pulses
         #+1 because there is a bug in the sync block!!! so sync comes one pps late(!)
         self.sync_time=int(time.time())+4+1
@@ -350,7 +350,7 @@ class spriteDBE(object):
                     feng_attrs[key] = self.config['FEngine'][key]
             self._logger.info('Constructing F-engine %d (roach: %s, ant: %d, band: %s)'%(fn, feng['host'], feng['ant'], feng['band']))
             self.fengs.append(engines.FEngine(self.fpgas[feng['host']], 
-                                      connect_passively=passive,
+                                      connect_passively=True,
                                       num=fn, **feng_attrs))
         self.n_fengs = len(self.fengs)
         self._logger.info('%d F-engines constructed'%self.n_fengs)
@@ -588,7 +588,7 @@ class spriteDBE(object):
                 if (key != 'nodes') and (key not in xeng_attrs.keys()):
                     xeng_attrs[key] = self.config['XEngine'][key]
             self._logger.info('Constructing X-engine %d (roach: %s)'%(xn, xeng['host']))
-            self.xengs.append(engines.XEngine(self.fpgas[xeng['host']], 'ctrl', connect_passively=passive, num=xn, **xeng_attrs))
+            self.xengs.append(engines.XEngine(self.fpgas[xeng['host']], 'ctrl', connect_passively=True, num=xn, **xeng_attrs))
         self.n_xengs = len(self.xengs)
         self._logger.info('%d X-engines constructed'%self.n_xengs)
 
@@ -748,7 +748,8 @@ class spriteSbl(spriteDBE):
     """
     A subclass of spriteDBE for the single-ROACH, single-baseline correlator
     """
-    def snap_corr(self,wait=True,combine_complex=True):
+
+    def snap_corr_wide(self,wait=True,combine_complex=False):
         """
         Snap new correlations from bram.
         If wait is True, this method will return the correlations when they are ready,
@@ -771,6 +772,18 @@ class spriteSbl(spriteDBE):
             array_fmt = np.int32
 
         xeng0 = self.xengs[0]
+
+        # flush vaccs
+        xeng0.write_int('corr00_ctrl',0)
+        xeng0.write_int('corr11_ctrl',0)
+        xeng0.write_int('corr01_r_ctrl',0)
+        xeng0.write_int('corr01_i_ctrl',0)
+        time.sleep(0.01)
+        xeng0.write_int('corr00_ctrl',1)
+        xeng0.write_int('corr11_ctrl',1)
+        xeng0.write_int('corr01_r_ctrl',1)
+        xeng0.write_int('corr01_i_ctrl',1)
+        
         if wait:
             mcnt = xeng0.read_int('mcnt_lsb')
             #sleep until there's a new correlation
@@ -785,34 +798,26 @@ class spriteSbl(spriteDBE):
             mcnt_msb = xeng.read_uint('mcnt_msb')
             mcnt_lsb = xeng.read_uint('mcnt_lsb')
             mcnt = (mcnt_msb << 32) + mcnt_lsb
-            pack_format = '>%d%s'%(self.n_chans,str(self.output_format))
+            #pack_format = '>%d%s'%(self.n_chans,str(self.output_format))
+            pack_format = '>%dq'%(self.n_chans) 
             c_pack_format = '>%d%s'%(2*self.n_chans,str(self.output_format))
             n_bytes = struct.calcsize(pack_format)
-            if xeng.band == 'low':
-                snap00[0:self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr00_bram',n_bytes)))
-                snap11[0:self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr11_bram',n_bytes)))
-                snap01[0:2*self.n_chans]   = np.array(struct.unpack(c_pack_format,xeng.read('corr01_bram',2*n_bytes)))
-            else:
-                snap00[(self.n_bands-1)*self.n_chans:self.n_bands*self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr00_bram',n_bytes)))[::-1]
-                snap11[(self.n_bands-1)*self.n_chans:self.n_bands*self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr11_bram',n_bytes)))[::-1]
-                temp   = np.array(struct.unpack(c_pack_format,xeng.read('corr01_bram',2*n_bytes)))
-                temp_flipped = np.zeros_like(temp)
-                temp_flipped[0::2] = temp[-2::-2]
-                temp_flipped[1::2] = temp[-1::-2]
-                snap01[2*(self.n_bands-1)*self.n_chans:2*self.n_bands*self.n_chans]   = temp_flipped[:]
-            #snap01c  = np.array(snap01[1::2] + 1j*snap01[0::2], dtype=complex)
-            #snap00   = np.zeros(self.n_chans)
-            #snap11   = np.zeros(self.n_chans)
-            #snap01   = np.zeros(2*self.n_chans)
+            
+            snap00[0:self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr00_bram',n_bytes)))
+            snap11[0:self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr11_bram',n_bytes)))
+            snap01[0:self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr01_r_bram',n_bytes)))
+            snap01[self.n_chans:2*self.n_chans]   = np.array(struct.unpack(pack_format,xeng.read('corr01_i_bram',n_bytes)))            
+            
+
+            
             if mcnt_lsb != xeng.read_uint('mcnt_lsb'):
                 print mcnt_lsb, xeng.read_uint('mcnt_lsb')
                 print "SNAP CORR: mcnt changed before snap completed!"
                 return None
 
-        if combine_complex:
-            snap01   = np.array(snap01[0::2] + 1j*snap01[1::2], dtype=complex)
         return {'corr00':snap00,'corr11':snap11,'corr01':snap01,'timestamp':self.mcnt2time(mcnt)}
 
+    
 
     def mcnt2time(self, mcnt):
         """

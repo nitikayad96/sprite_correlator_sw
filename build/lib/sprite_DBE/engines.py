@@ -39,10 +39,10 @@ class Engine(object):
         self.reg_suffix = reg_suffix
         self.reg_prefix = reg_prefix
         self.num = num
-        if connect_passively:
-            self.get_ctrl_sw()
-        else:
-            self.initialise_ctrl_sw()
+        #if connect_passively:
+        #    self.get_ctrl_sw()
+        #else:
+        #    self.initialise_ctrl_sw()
 
     def initialise_ctrl_sw(self):
         """Initialises the control software register to zero."""
@@ -99,7 +99,8 @@ class Engine(object):
         to distinguish between multiple engines
         on the same roach board
         """
-        return self.reg_prefix + name + self.reg_suffix
+        #return self.reg_prefix + name + self.reg_suffix
+        return name + self.reg_suffix
 
     def contract_name(self,name=''):
         """
@@ -213,9 +214,9 @@ class FEngine(Engine):
         #Engine.__init__(self,roachhost,ctrl_reg=ctrl_reg, reg_prefix='feng_', reg_suffix=str(self.adc), connect_passively=connect_passively)
         # set the default noise seed
         if not connect_passively:
-            self.set_adc_noise_tvg_seed()
-            self.phase_switch_enable(self.phase_switch)
-            self.noise_switch_enable(True)
+            #self.set_adc_noise_tvg_seed()
+            #self.phase_switch_enable(self.phase_switch)
+            #self.noise_switch_enable(True)
             self.set_adc_acc_len()
             self.set_fft_acc_len()
             #self.set_ant_id(self.ant)
@@ -278,7 +279,11 @@ class FEngine(Engine):
         """
         Write the fft_shift value for this engine
         """
-        self.write_int('fft_shift',shift)
+        try:
+            self.write_int('fft_shift',shift)
+        except:
+            self.write_int('fft_shift0',shift)
+            self.write_int('fft_shift2',shift)
 
     def gen_freq_scale(self):
         """
@@ -446,10 +451,10 @@ class FEngine(Engine):
         return np.abs(float(v) / (16 * 256 * (self.adc_power_acc_len >> (8 + 4))))
 
     def get_spectra(self, *args, **kwargs):
-        if self.has_spectra_snap:
-            return self.get_spectra_snap(*args, **kwargs)
-        else:
-            return self.get_spectra_nosnap(*args, **kwargs)
+        #if self.has_spectra_snap:
+        return self.get_spectra_snap(*args, **kwargs)
+        #else:
+        #return self.get_spectra_nosnap(*args, **kwargs)
 
     def set_auto_capture(self, val):
         self.write_int('auto_snap_capture', int(val))
@@ -463,7 +468,7 @@ class FEngine(Engine):
             acc_cnt = self.read_int('auto_snap_acc_cnt')
         return acc_cnt
 
-    def get_spectra_nosnap(self, autoflip=False, safe=True):
+    def get_spectra_nosnap(self, autoflip=False, safe=False):
         if safe:
             self.set_auto_capture(True)
  

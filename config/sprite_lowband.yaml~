@@ -37,7 +37,7 @@ XEngine:
 
     nodes:
         - band: low
-          host: 192.168.10.100
+          host: 192.168.10.101
 
 
 Array:
@@ -69,15 +69,15 @@ FEngine:
         - ant: 0
           band: low
           adc: 0
-          host: 192.168.10.100
+          host: 192.168.10.101
           phase_switch: no
 
         - ant: 1
           band: low
           adc: 1
-          host: 192.168.10.100
+          host: 192.168.10.101
           phase_switch: no
 
 XEngines:
     - chans: 0, 2047
-      host: 192.168.10.100
+      host: 192.168.10.101

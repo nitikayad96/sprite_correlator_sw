@@ -1,7 +1,6 @@
 Configuration:
     katcp_port: 7147
-    #boffile: ami_fx_sbl_nofs_2014_Sep_30_1526.bof
-    boffile: ami_fx_sbl_wide_2014_Feb_07_1646.bof
+    boffile: ami_fx_sbl_nofs_2014_Sep_30_1526.bof
     # control_interface keys taken from AMIDC_sbl_4bit.yaml --> need to figure out correct parameters and set them
     control_interface:
         host: 131.215.195.193
@@ -59,7 +58,7 @@ FEngine:
     #fft_power_acc_len counts in spectra. 1048537 is about 0.85s
     #(but at the moment it can only be a number <= 20 bits)
     fft_power_acc_len: 1048575
-    adc_clk: 4000
+    adc_clk: 2000
     mix_freq: 9000
     eq_dec: 2
     eq_format: 'H'

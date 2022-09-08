@@ -15,7 +15,7 @@ Configuration:
             n_chans: 2048
             inputs_per_board: 2
             window_len: 8
-            output_format: l
+            output_format: q
             n_pols: 1
             sync_period: 738197504 # copied from Jack's code
         runtime:
@@ -28,7 +28,7 @@ Configuration:
                 qdr_tvg: no
                 vacc_tvg: no
             acc_len: 152588
-            data_path: /home/sprite/installs/sprite_correlator_sw/data
+            data_path: /home/sprite/installs/sprite_correlator_sw/data/highband
 
 XEngine:
     n_chans: 2048
